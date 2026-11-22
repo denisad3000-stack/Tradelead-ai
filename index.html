@@ -161,8 +161,30 @@ button.danger {background:#713b48;color:white}
 
 </section>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2'"></script>
 <script>
+(async function bootTradeLead() {
+  const loadScript = (src) => new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Could not load " + src));
+    document.head.appendChild(script);
+  });
+  try {
+    try {
+      await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2");
+    } catch (firstError) {
+      await loadScript("https://unpkg.com/@supabase/supabase-js@2");
+    }
+    if (!window.supabase || !window.supabase.createClient) {
+      throw new Error("The secure account service did not load. Please check your internet connection and refresh.");
+    }
+    const SUPABASE_URL = "__SUPABASE_URL__";
+    const SUPABASE_KEY = "__SUPABASE_ANON_KEY__";
+    if (SUPABASE_URL.startsWith("__") || SUPABASE_KEY.startsWith("__")) {
+      throw new Error("The account service is not configured yet. Please contact support.");
+    }
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const SUPABASE_URL = "__SUPABASE_URL__";
 const SUPABASE_KEY = "__SUPABASE_ANON_KEY__";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -323,6 +345,16 @@ el("search").addEventListener("input", render);
 el("filter").addEventListener("change", render);
 render();
 refreshSession();
+
+  } catch (error) {
+    console.error("TradeLead startup error:", error);
+    const message = document.getElementById("authMessage");
+    if (message) {
+      message.textContent = "App startup problem: " + (error && error.message ? error.message : "Please refresh and try again.");
+      message.style.color = "#ff9b9b";
+    }
+  }
+})();
 </script>
 </body>
 </html>
