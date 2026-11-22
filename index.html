@@ -210,9 +210,34 @@ el("signInBtn").addEventListener("click", async () => {
   if(error) showMessage(error.message,true); else showMessage("Signed in successfully.");
 });
 el("signUpBtn").addEventListener("click", async () => {
-  const {data,error}=await supabase.auth.signUp({email:el("authEmail").value.trim(),password:el("authPassword").value});
-  if(error) showMessage(error.message,true);
-  else showMessage(data.session ? "Account created. You are signed in." : "Account created. Check your email to confirm, then sign in.");
+  const button = el("signUpBtn");
+  const email = el("authEmail").value.trim();
+  const password = el("authPassword").value;
+  if (!email || !el("authEmail").checkValidity()) {
+    showMessage("Please enter a valid email address.", true);
+    el("authEmail").focus();
+    return;
+  }
+  if (password.length < 6) {
+    showMessage("Please enter a password with at least 6 characters.", true);
+    el("authPassword").focus();
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Creating account...";
+  showMessage("Connecting securely to create your account...");
+  try {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) showMessage("Sign-up failed: " + error.message, true);
+    else showMessage(data.session
+      ? "Account created. You are signed in."
+      : "Account created. Check your email to confirm, then sign in.");
+  } catch (error) {
+    showMessage("Could not reach the sign-up service: " + (error?.message || "Please check your connection and try again."), true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Create account";
+  }
 });
 el("logoutBtn").addEventListener("click", async () => {
   const {error}=await supabase.auth.signOut();
