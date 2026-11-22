@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeLead AI</title>
+<style>
+:root {
+  --bg:#101827; --panel:#1b283b; --text:#f4f7fb;
+  --muted:#9aabc0; --accent:#36d6a0; --line:#304158;
+}
+* {box-sizing:border-box}
+body {
+  margin:0; padding:20px; background:var(--bg); color:var(--text);
+  font-family:Arial,sans-serif;
+}
+.container {max-width:900px;margin:auto}
+header {display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1 {margin:0;font-size:27px}
+h1 span {color:var(--accent)}
+.subtitle {color:var(--muted);margin-top:7px}
+.panel {
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;padding:17px;margin-top:18px;
+}
+.stats {display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stat {background:#24344a;padding:15px;border-radius:10px}
+.stat small {color:var(--muted)}
+.stat strong {display:block;font-size:25px;margin-top:8px}
+h2 {font-size:18px;margin:0 0 14px}
+label {display:block;color:var(--muted);font-size:13px;margin:12px 0 6px}
+input,select,textarea {
+  width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);
+  background:#111d2d;color:var(--text);font-size:15px;
+}
+textarea {min-height:75px;resize:vertical}
+button {
+  border:0;border-radius:8px;padding:12px 15px;
+  background:var(--accent);color:#08251d;font-weight:bold;
+  cursor:pointer;margin-top:12px;
+}
+button.secondary {background:#304158;color:var(--text)}
+button.danger {background:#713b48;color:white}
+.formgrid {display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lead {
+  border:1px solid var(--line);border-radius:10px;padding:13px;
+  margin-top:10px;background:#172438;
+}
+.leadtop {display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.lead strong {font-size:16px}
+.muted {color:var(--muted);font-size:13px;margin-top:5px}
+.tag {font-size:12px;padding:5px 8px;border-radius:20px;background:#304158}
+.actions {display:flex;gap:7px;flex-wrap:wrap}
+.actions button {font-size:12px;padding:8px;margin-top:10px}
+.empty {color:var(--muted);text-align:center;padding:20px}
+@media(max-width:520px) {
+  body {padding:14px}
+  .formgrid {grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <div>
+    <h1>TradeLead <span>AI</span></h1>
+    <div class="subtitle">Your business. Your customers. Your next opportunity.</div>
+  </div>
+  <span class="tag">MVP Prototype</span>
+</header>
+
+<section class="panel">
+  <h2>Business overview</h2>
+  <div class="stats">
+    <div class="stat"><small>Total leads</small><strong id="total">0</strong></div>
+    <div class="stat"><small>Potential revenue</small><strong id="revenue">£0</strong></div>
+    <div class="stat"><small>Won jobs</small><strong id="won">0</strong></div>
+    <div class="stat"><small>Follow-ups due</small><strong id="due">0</strong></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Add a new lead</h2>
+  <form id="leadForm">
+    <div class="formgrid">
+      <div>
+        <label>Customer name *</label>
+        <input id="name" required placeholder="e.g. John Smith">
+      </div>
+      <div>
+        <label>Phone number</label>
+        <input id="phone" type="tel" placeholder="Customer phone">
+      </div>
+      <div>
+        <label>Trade</label>
+        <select id="trade">
+          <option>Builder</option><option>Plumber</option>
+          <option>Electrician</option><option>Painter / Decorator</option>
+          <option>Roofer</option><option>Carpenter</option>
+          <option>Landscaper</option><option>Cleaner</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div>
+        <label>Estimated job value (£)</label>
+        <input id="value" type="number" min="0" placeholder="e.g. 1500">
+      </div>
+      <div>
+        <label>Lead status</label>
+        <select id="status">
+          <option>New</option><option>Contacted</option>
+          <option>Quote sent</option><option>Won</option>
+          <option>Lost</option>
+        </select>
+      </div>
+      <div>
+        <label>Follow-up date</label>
+        <input id="followup" type="date">
+      </div>
+    </div>
+    <label>Job details</label>
+    <textarea id="details" placeholder="Describe the work required..."></textarea>
+    <button type="submit">+ Save customer lead</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Customer pipeline</h2>
+  <input id="search" placeholder="Search customers or trades...">
+  <label>Filter by status</label>
+  <select id="filter">
+    <option value="All">All leads</option>
+    <option>New</option><option>Contacted</option>
+    <option>Quote sent</option><option>Won</option><option>Lost</option>
+  </select>
+  <div id="leads"></div>
+</section>
+
+<section class="panel">
+  <h2>Quick quote estimator</h2>
+  <label>Estimated labour (£)</label>
+  <input id="labour" type="number" min="0" placeholder="e.g. 500">
+  <label>Estimated materials (£)</label>
+  <input id="materials" type="number" min="0" placeholder="e.g. 250">
+  <label>Additional costs (£)</label>
+  <input id="extras" type="number" min="0" placeholder="e.g. 50">
+  <button type="button" onclick="calculateQuote()">Calculate estimate</button>
+  <h2 id="quoteTotal" style="margin-top:16px">Estimated total: £0</h2>
+  <div class="muted">A basic estimate, not a formal quotation or tax calculation.</div>
+</section>
+</div>
+
+<script>
+const KEY = "tradelead_ai_leads_v1";
+let leads = JSON.parse(localStorage.getItem(KEY) || "[]");
+
+const el = id => document.getElementById(id);
+const money = n => "£" + Number(n || 0).toLocaleString("en-GB", {maximumFractionDigits:2});
+
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(leads));
+  render();
+}
+
+el("leadForm").addEventListener("submit", function(event) {
+  event.preventDefault();
+  leads.unshift({
+    id: Date.now(),
+    name: el("name").value.trim(),
+    phone: el("phone").value.trim(),
+    trade: el("trade").value,
+    value: Number(el("value").value || 0),
+    status: el("status").value,
+    followup: el("followup").value,
+    details: el("details").value.trim()
+  });
+  save();
+  this.reset();
+});
+
+function updateStatus(id, status) {
+  leads = leads.map(l => l.id === id ? {...l, status} : l);
+  save();
+}
+
+function removeLead(id) {
+  if (!confirm("Delete this customer lead?")) return;
+  leads = leads.filter(l => l.id !== id);
+  save();
+}
+
+function render() {
+  el("total").textContent = leads.length;
+  el("revenue").textContent = money(
+    leads.filter(l => !["Won","Lost"].includes(l.status))
+         .reduce((sum,l) => sum + l.value, 0)
+  );
+  el("won").textContent = leads.filter(l => l.status === "Won").length;
+  const today = new Date().toISOString().slice(0,10);
+  el("due").textContent = leads.filter(l =>
+    l.followup && l.followup <= today && !["Won","Lost"].includes(l.status)
+  ).length;
+
+  const query = el("search").value.toLowerCase();
+  const filter = el("filter").value;
+  const filtered = leads.filter(l =>
+    (filter === "All" || l.status === filter) &&
+    (l.name.toLowerCase().includes(query) ||
+     l.trade.toLowerCase().includes(query))
+  );
+
+  el("leads").innerHTML = filtered.length ? filtered.map(l => `
+    <div class="lead">
+      <div class="leadtop">
+        <strong>${escapeHTML(l.name)}</strong>
+        <span class="tag">${escapeHTML(l.status)}</span>
+      </div>
+      <div class="muted">${escapeHTML(l.trade)} · ${money(l.value)}</div>
+      ${l.phone ? `<div class="muted">Phone: ${escapeHTML(l.phone)}</div>` : ""}
+      ${l.followup ? `<div class="muted">Follow-up: ${escapeHTML(l.followup)}</div>` : ""}
+      ${l.details ? `<div class="muted">${escapeHTML(l.details)}</div>` : ""}
+      <div class="actions">
+        <select aria-label="Change lead status" onchange="updateStatus(${l.id},this.value)">
+          ${["New","Contacted","Quote sent","Won","Lost"].map(s =>
+            `<option ${s===l.status?"selected":""}>${s}</option>`).join("")}
+        </select>
+        <button class="danger" onclick="removeLead(${l.id})">Delete</button>
+      </div>
+    </div>`).join("") : '<div class="empty">No leads found. Add your first customer above.</div>';
+}
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+  })[c]);
+}
+
+function calculateQuote() {
+  const total = ["labour","materials","extras"]
+    .reduce((sum,id) => sum + Math.max(0,Number(el(id).value || 0)),0);
+  el("quoteTotal").textContent = "Estimated total: " + money(total);
+}
+
+el("search").addEventListener("input", render);
+el("filter").addEventListener("change", render);
+render();
+</script>
+</body>
+</html>
