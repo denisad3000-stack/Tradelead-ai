@@ -185,9 +185,6 @@ button.danger {background:#713b48;color:white}
       throw new Error("The account service is not configured yet. Please contact support.");
     }
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const SUPABASE_URL = "__SUPABASE_URL__";
-const SUPABASE_KEY = "__SUPABASE_ANON_KEY__";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let leads = [];
 let currentUser = null;
 
