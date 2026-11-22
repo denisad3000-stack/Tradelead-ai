@@ -66,10 +66,19 @@ button.danger {background:#713b48;color:white}
     <h1>TradeLead <span>AI</span></h1>
     <div class="subtitle">Your business. Your customers. Your next opportunity.</div>
   </div>
-  <span class="tag">MVP Prototype</span>
+  <div><span class="tag">Cloud-connected MVP</span><button id="logoutBtn" class="secondary" style="display:none;margin-left:8px">Sign out</button></div>
 </header>
 
-<section class="panel">
+<section class="panel" id="authPanel">
+  <h2>Secure account access</h2>
+  <p class="muted">Create an account or sign in to access your own customer leads.</p>
+  <label>Email address</label><input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com">
+  <label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="At least 6 characters">
+  <div class="actions"><button id="signInBtn" type="button">Sign in</button><button id="signUpBtn" type="button" class="secondary">Create account</button></div>
+  <p id="authMessage" class="muted" role="status">Sign in to load your secure cloud data.</p>
+</section>
+
+<section class="panel" id="appPanel" style="display:none">
   <h2>Business overview</h2>
   <div class="stats">
     <div class="stat"><small>Total leads</small><strong id="total">0</strong></div>
@@ -150,81 +159,125 @@ button.danger {background:#713b48;color:white}
 </section>
 </div>
 
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const KEY = "tradelead_ai_leads_v1";
-let leads = JSON.parse(localStorage.getItem(KEY) || "[]");
+const SUPABASE_URL = "__SUPABASE_URL__";
+const SUPABASE_KEY = "__SUPABASE_ANON_KEY__";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let leads = [];
+let currentUser = null;
 
 const el = id => document.getElementById(id);
 const money = n => "£" + Number(n || 0).toLocaleString("en-GB", {maximumFractionDigits:2});
 
-function save() {
-  localStorage.setItem(KEY, JSON.stringify(leads));
+async function loadLeads() {
+  const { data, error } = await supabase.from("leads").select("*").order("created_at",{ascending:false});
+  if (error) throw error;
+  leads = (data || []).map(row => ({
+    id: row.id, name: row.name, phone: row.phone || "", trade: row.trade || "Other",
+    value: Number(row.estimated_value || 0), status: titleStatus(row.status || "new"),
+    followup: row.follow_up || "", details: row.details || row.enquiry || ""
+  }));
   render();
 }
+function titleStatus(value) {
+  return String(value || "new").replace(/\\b\\w/g, c => c.toUpperCase());
+}
+function dbStatus(value) { return String(value || "New").toLowerCase(); }
+function showMessage(message, isError=false) {
+  el("authMessage").textContent = message;
+  el("authMessage").style.color = isError ? "#ff9b9b" : "var(--muted)";
+}
+async function refreshSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) { showMessage(error.message,true); return; }
+  currentUser = data.session?.user || null;
+  el("appPanel").style.display = currentUser ? "block" : "none";
+  el("logoutBtn").style.display = currentUser ? "inline-block" : "none";
+  if (currentUser) {
+    el("authPanel").style.display = "none";
+    try { await loadLeads(); }
+    catch (e) { showMessage("Could not load leads: " + e.message,true); }
+  } else {
+    el("authPanel").style.display = "block";
+    leads = []; render();
+  }
+}
+el("signInBtn").addEventListener("click", async () => {
+  const {error}=await supabase.auth.signInWithPassword({email:el("authEmail").value.trim(),password:el("authPassword").value});
+  if(error) showMessage(error.message,true); else showMessage("Signed in successfully.");
+});
+el("signUpBtn").addEventListener("click", async () => {
+  const {data,error}=await supabase.auth.signUp({email:el("authEmail").value.trim(),password:el("authPassword").value});
+  if(error) showMessage(error.message,true);
+  else showMessage(data.session ? "Account created. You are signed in." : "Account created. Check your email to confirm, then sign in.");
+});
+el("logoutBtn").addEventListener("click", async () => {
+  const {error}=await supabase.auth.signOut();
+  if(error) showMessage(error.message,true);
+  await refreshSession();
+});
+supabase.auth.onAuthStateChange(() => { setTimeout(refreshSession,0); });
 
-el("leadForm").addEventListener("submit", function(event) {
+el("leadForm").addEventListener("submit", async function(event) {
   event.preventDefault();
-  leads.unshift({
-    id: Date.now(),
+  if (!currentUser) return showMessage("Please sign in first.",true);
+  const record = {
+    user_id: currentUser.id,
     name: el("name").value.trim(),
-    phone: el("phone").value.trim(),
+    phone: el("phone").value.trim() || null,
     trade: el("trade").value,
-    value: Number(el("value").value || 0),
-    status: el("status").value,
-    followup: el("followup").value,
-    details: el("details").value.trim()
-  });
-  save();
+    estimated_value: Number(el("value").value || 0),
+    status: dbStatus(el("status").value),
+    follow_up: el("followup").value || null,
+    details: el("details").value.trim() || null,
+    enquiry: el("details").value.trim() || null
+  };
+  const {error}=await supabase.from("leads").insert(record);
+  if(error) { showMessage("Could not save lead: "+error.message,true); return; }
   this.reset();
+  try { await loadLeads(); showMessage("Lead saved securely."); }
+  catch(e) { showMessage("Saved, but refresh failed: "+e.message,true); }
 });
 
-function updateStatus(id, status) {
-  leads = leads.map(l => l.id === id ? {...l, status} : l);
-  save();
+async function updateStatus(id, status) {
+  const {error}=await supabase.from("leads").update({status:dbStatus(status)}).eq("id",id);
+  if(error) { showMessage("Could not update lead: "+error.message,true); return; }
+  await loadLeads();
 }
-
-function removeLead(id) {
+async function removeLead(id) {
   if (!confirm("Delete this customer lead?")) return;
-  leads = leads.filter(l => l.id !== id);
-  save();
+  const {error}=await supabase.from("leads").delete().eq("id",id);
+  if(error) { showMessage("Could not delete lead: "+error.message,true); return; }
+  await loadLeads();
 }
 
 function render() {
   el("total").textContent = leads.length;
-  el("revenue").textContent = money(
-    leads.filter(l => !["Won","Lost"].includes(l.status))
-         .reduce((sum,l) => sum + l.value, 0)
-  );
+  el("revenue").textContent = money(leads.filter(l => !["Won","Lost"].includes(l.status)).reduce((sum,l) => sum + l.value,0));
   el("won").textContent = leads.filter(l => l.status === "Won").length;
-  const today = new Date().toISOString().slice(0,10);
-  el("due").textContent = leads.filter(l =>
-    l.followup && l.followup <= today && !["Won","Lost"].includes(l.status)
-  ).length;
-
+  const today = new Date().toLocaleDateString("en-CA");
+  el("due").textContent = leads.filter(l => l.followup && l.followup <= today && !["Won","Lost"].includes(l.status)).length;
   const query = el("search").value.toLowerCase();
   const filter = el("filter").value;
   const filtered = leads.filter(l =>
     (filter === "All" || l.status === filter) &&
-    (l.name.toLowerCase().includes(query) ||
-     l.trade.toLowerCase().includes(query))
+    (l.name.toLowerCase().includes(query) || (l.trade || "").toLowerCase().includes(query))
   );
-
   el("leads").innerHTML = filtered.length ? filtered.map(l => `
     <div class="lead">
-      <div class="leadtop">
-        <strong>${escapeHTML(l.name)}</strong>
-        <span class="tag">${escapeHTML(l.status)}</span>
-      </div>
-      <div class="muted">${escapeHTML(l.trade)} · ${money(l.value)}</div>
+      <div class="leadtop"><strong>${escapeHTML(l.name)}</strong><span class="tag">${escapeHTML(l.status)}</span></div>
+      <div class="muted">${escapeHTML(l.trade || "Other")} · ${money(l.value)}</div>
       ${l.phone ? `<div class="muted">Phone: ${escapeHTML(l.phone)}</div>` : ""}
       ${l.followup ? `<div class="muted">Follow-up: ${escapeHTML(l.followup)}</div>` : ""}
       ${l.details ? `<div class="muted">${escapeHTML(l.details)}</div>` : ""}
       <div class="actions">
-        <select aria-label="Change lead status" onchange="updateStatus(${l.id},this.value)">
-          ${["New","Contacted","Quote sent","Won","Lost"].map(s =>
-            `<option ${s===l.status?"selected":""}>${s}</option>`).join("")}
+        <select aria-label="Change lead status" onchange="updateStatus('${l.id}',this.value)">
+          ${["New","Contacted","Quote sent","Won","Lost"].map(s => `<option ${s===l.status?"selected":""}>${s}</option>`).join("")}
         </select>
-        <button class="danger" onclick="removeLead(${l.id})">Delete</button>
+        <button class="danger" onclick="removeLead('${l.id}')">Delete</button>
       </div>
     </div>`).join("") : '<div class="empty">No leads found. Add your first customer above.</div>';
 }
@@ -244,6 +297,7 @@ function calculateQuote() {
 el("search").addEventListener("input", render);
 el("filter").addEventListener("change", render);
 render();
+refreshSession();
 </script>
 </body>
 </html>
