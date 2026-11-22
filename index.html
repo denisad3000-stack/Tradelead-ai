@@ -162,12 +162,25 @@ button.danger {background:#713b48;color:white}
 </section>
 
 <script>
+// Give immediate feedback even if the external authentication library is slow to load.
+document.addEventListener("click", function(event) {
+  const button = event.target.closest("#signUpBtn, #signInBtn");
+  if (button && !window.__tradeLeadReady) {
+    const message = document.getElementById("authMessage");
+    if (message) {
+      message.textContent = "The secure sign-in service is still loading. Please wait a moment and try again.";
+      message.style.color = "#ffd27a";
+    }
+  }
+}, true);
+
 (async function bootTradeLead() {
   const loadScript = (src) => new Promise((resolve, reject) => {
     const script = document.createElement("script");
+    const timeout = setTimeout(() => reject(new Error("Timed out loading the secure sign-in service.")), 10000);
     script.src = src;
-    script.onload = resolve;
-    script.onerror = () => reject(new Error("Could not load " + src));
+    script.onload = () => { clearTimeout(timeout); resolve(); };
+    script.onerror = () => { clearTimeout(timeout); reject(new Error("Could not load " + src)); };
     document.head.appendChild(script);
   });
   try {
@@ -185,6 +198,7 @@ button.danger {background:#713b48;color:white}
       throw new Error("The account service is not configured yet. Please contact support.");
     }
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+window.__tradeLeadReady = true;
 let leads = [];
 let currentUser = null;
 
