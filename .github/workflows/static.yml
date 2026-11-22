@@ -33,6 +33,23 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
+      - name: Configure Supabase public client
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          path = Path("index.html")
+          html = path.read_text()
+          url = os.environ.get("SUPABASE_URL", "")
+          key = os.environ.get("SUPABASE_ANON_KEY", "")
+          if not url or not key:
+              raise SystemExit("Missing SUPABASE_URL or SUPABASE_ANON_KEY repository secret.")
+          html = html.replace("__SUPABASE_URL__", url).replace("__SUPABASE_ANON_KEY__", key)
+          path.write_text(html)
+          PY
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
